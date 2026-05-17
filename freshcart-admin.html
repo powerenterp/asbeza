@@ -6,6 +6,7 @@
 <title>FreshCart Admin — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1142,6 +1143,8 @@ async function initFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.app().firestore();
+    // Sign in anonymously so Firestore rules that require auth work
+    try { await firebase.auth().signInAnonymously(); } catch(e) { console.warn('Anonymous auth skipped:', e.code); }
     try { await db.enablePersistence({ synchronizeTabs: true }); } catch(e) {}
     productsRef = db.collection('products');
     ordersRef = db.collection('orders');
