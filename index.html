@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1421,7 +1422,9 @@ async function initFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.app().firestore();
-    // Enable offline persistence for better reliability
+    // Sign in anonymously so Firestore rules that require auth (request.auth != null) work
+    try { await firebase.auth().signInAnonymously(); } catch(e) { console.warn('Anonymous auth skipped:', e.code); }
+    // Enable offline persistence
     try {
       await db.enablePersistence({ synchronizeTabs: true });
     } catch(e) {
@@ -1432,13 +1435,13 @@ async function initFirebase() {
     usersCollectionRef = db.collection('users');
     categoriesCollectionRef = db.collection('categories');
     firebaseEnabled = true;
+    showSyncStatus('online');
     listenCategories();
     listenProducts();
     listenOrders();
-    // Monitor connection
-    db.collection('_ping').doc('status').onSnapshot(() => showSyncStatus('online'), () => showSyncStatus('offline'));
   } catch (error) {
-    console.warn('Firebase init failed', error);
+    console.warn('Firebase init failed:', error);
+    showToast('Cloud sync unavailable — using saved data');
     renderProducts();
   }
 }
@@ -1522,7 +1525,12 @@ function listenProducts() {
     PRODUCTS = snap.docs.map(d => ({ id: d.id, docId: d.id, ...d.data() }));
     saveProductsLocal();
     renderProducts();
-  }, err => { console.warn('Products listener error', err); showSyncStatus('offline'); });
+    showSyncStatus('online');
+  }, err => {
+    console.warn('Products listener error:', err.code || err);
+    showSyncStatus('offline');
+    showToast('Cloud sync failed — showing saved data');
+  });
 }
 
 function listenOrders() {
