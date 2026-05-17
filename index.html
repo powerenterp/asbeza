@@ -1029,7 +1029,7 @@ let PRODUCTS = [];
 let cart = {};
 let currentCategory = 'All';
 let searchQuery = '';
-const DEFAULT_PRODUCTS = JSON.parse(JSON.stringify(PRODUCTS));
+const DEFAULT_PRODUCTS = [];
 let firebaseEnabled = false;
 let db = null;
 let productsCollectionRef = null;
@@ -1037,12 +1037,12 @@ let ordersCollectionRef = null;
 let usersCollectionRef = null;
 
 const firebaseConfig = {
-  apiKey: "AIzaSyByTcdFcZDo0Cv_Dmo_IW3EeP2KTe-K_dQ",
-  authDomain: "powerims.firebaseapp.com",
-  projectId: "powerims",
-  storageBucket: "powerims.firebasestorage.app",
-  messagingSenderId: "306983469410",
-  appId: "1:306983469410:web:d65eedf6eb78602a8e6c3b",
+apiKey: "AIzaSyAV0CejRmuZOZt5Njzws2Usdedqi8Z7sGc",
+  authDomain: "asbeza-power.firebaseapp.com",
+  projectId: "asbeza-power",
+  storageBucket: "asbeza-power.firebasestorage.app",
+  messagingSenderId: "898781253572",
+  appId: "1:898781253572:web:11c25f99066da485de5e91",
 };
 
 function isFirebaseConfigValid() {
@@ -1074,12 +1074,9 @@ async function initFirebase() {
 
 async function loadProductsFromFirestore() {
   const snapshot = await productsCollectionRef.orderBy('name').get();
-  if (snapshot.empty) {
-    await seedProducts(DEFAULT_PRODUCTS);
-    return loadProductsFromFirestore();
-  }
   PRODUCTS = snapshot.docs.map(doc => ({ id: doc.id, docId: doc.id, ...doc.data() }));
   renderProducts();
+  renderAdminProductsTable();
 }
 
 async function seedProducts(list) {
@@ -1525,6 +1522,13 @@ async function deleteUserFirestore(docId) {
   renderUsersTable();
 }
 
+function getNextLocalProductId() {
+  const numericIds = PRODUCTS
+    .map(p => Number(p.id))
+    .filter(id => Number.isFinite(id));
+  return numericIds.length ? Math.max(...numericIds) + 1 : PRODUCTS.length + 1;
+}
+
 async function addProductFromForm() {
   const imageInput = document.getElementById('newImageFile');
   const name = document.getElementById('newName').value.trim();
@@ -1543,21 +1547,26 @@ async function addProductFromForm() {
     image = await readFileAsDataURL(imageInput.files[0]);
   }
 
-  const newProduct = { name, image, price, unit, category, badge: badge || undefined };
+  const newProduct = { name, price, unit, category };
+  if (image) newProduct.image = image;
+  if (badge) newProduct.badge = badge;
 
   if (firebaseEnabled) {
     try {
-      const docRef = await productsCollectionRef.add(newProduct);
+      const docRef = await productsCollectionRef.add({
+        ...newProduct,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
       PRODUCTS.push({ ...newProduct, id: docRef.id, docId: docRef.id });
     } catch (err) {
       console.warn('Failed to save product to Firestore', err);
-      const nextId = PRODUCTS.reduce((max, item) => Math.max(max, item.id || 0), 0) + 1;
+      const nextId = getNextLocalProductId();
       PRODUCTS.push({ id: nextId, ...newProduct });
       firebaseEnabled = false;
       showToast('Firebase unavailable, product saved locally');
     }
   } else {
-    const nextId = PRODUCTS.reduce((max, item) => Math.max(max, item.id || 0), 0) + 1;
+    const nextId = getNextLocalProductId();
     PRODUCTS.push({ id: nextId, ...newProduct });
   }
 
@@ -1568,6 +1577,7 @@ async function addProductFromForm() {
   document.getElementById('newName').value = '';
   document.getElementById('newPrice').value = '';
   document.getElementById('newUnit').value = '';
+  document.getElementById('newCategory').selectedIndex = 0;
   document.getElementById('newBadge').value = '';
 }
 
@@ -1595,12 +1605,13 @@ async function saveEditProduct() {
   if (!product) return;
 
   const imageInput = document.getElementById('eImageFile');
+  const badgeValue = document.getElementById('eBadge').value.trim();
   const updatedFields = {
     name: document.getElementById('eName').value.trim() || product.name,
     price: parseFloat(document.getElementById('ePrice').value) || product.price,
     unit: document.getElementById('eUnit').value.trim() || product.unit,
     category: document.getElementById('eCategory').value,
-    badge: document.getElementById('eBadge').value || undefined
+    ...(badgeValue ? { badge: badgeValue } : {})
   };
 
   if (imageInput.files && imageInput.files[0]) {
@@ -1769,6 +1780,7 @@ function signOutUser() {
   renderProfileArea();
 }
 
+renderProfileArea();
 initFirebase();
 </script>
 </body>
